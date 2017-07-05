@@ -1,0 +1,18 @@
+[epel]
+baseurl=http://220.231.201.236/epel/7/$basearch
+failovermethod=priority
+enabled=1
+gpgcheck=1
+gpgkey=http://220.231.201.236/epel/RPM-GPG-KEY-EPEL-7
+[epel-debuginfo]
+baseurl=http://220.231.201.236/epel/beta/7/$basearch/debug
+failovermethod=priority
+enabled=0
+gpgkey =http://220.231.201.236/epel/RPM-GPG-KEY-EPEL-7
+gpgcheck=1
+[epel-source]
+baseurl=http://220.231.201.236/epel/beta/7/SRPMS
+failovermethod=priority
+enabled=0
+gpgkey =http://220.231.201.236/epel/RPM-GPG-KEY-EPEL-7
+gpgcheck=1

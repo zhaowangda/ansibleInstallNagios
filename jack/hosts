@@ -1,0 +1,100 @@
+[stackwatch]
+prostackwatch ansible_ssh_host=10.1.31.24 ansible_ssh_pass=huayun2016
+#nagiosServer ansible_ssh_host=10.1.31.25 ansible_ssh_pass=huayun2016
+
+[production]
+metro-controller01 ansible_ssh_host=10.1.31.11 ansible_ssh_pass=huayun2016
+metro-controller02 ansible_ssh_host=10.1.31.12 ansible_ssh_pass=huayun2016
+metro-controller03 ansible_ssh_host=10.1.31.13 ansible_ssh_pass=huayun2016
+[production-compute]
+pro-compute01 ansible_ssh_host=10.1.31.18 ansible_ssh_pass=huayun2016
+pro-compute02 ansible_ssh_host=10.1.31.17 ansible_ssh_pass=huayun2016
+pro-compute03 ansible_ssh_host=10.1.31.16 ansible_ssh_pass=huayun2016
+pro-compute04 ansible_ssh_host=10.1.31.14 ansible_ssh_pass=huayun2016
+pro-compute05 ansible_ssh_host=10.1.31.15 ansible_ssh_pass=huayun2016
+pro-compute06 ansible_ssh_host=10.1.31.19 ansible_ssh_pass=huayun2016
+pro-compute07 ansible_ssh_host=10.1.31.20 ansible_ssh_pass=huayun2016
+#pro-compute08 ansible_ssh_host=10.1.31.21 ansible_ssh_pass=huayun2016
+dmz-compute01 ansible_ssh_host=10.4.31.11 ansible_ssh_pass=huayun2016
+dmz-compute02 ansible_ssh_host=10.4.31.12 ansible_ssh_pass=huayun2016
+dmz-compute03 ansible_ssh_host=10.4.31.13 ansible_ssh_pass=huayun2016
+dmz-compute04 ansible_ssh_host=10.4.31.14 ansible_ssh_pass=huayun2016
+#pro-test-compute01 ansible_ssh_host=10.1.40.12 ansible_ssh_pass=huayun2016
+#==================================================================================
+[proucs]
+proucs-compute01    ansible_host=10.1.31.31    ansible_ssh_pass=Huayun201&
+proucs-compute02    ansible_host=10.1.31.32    ansible_ssh_pass=Huayun201&
+proucs-compute03    ansible_host=10.1.31.33    ansible_ssh_pass=Huayun201&
+proucs-compute04    ansible_host=10.1.31.34    ansible_ssh_pass=Huayun201&
+proucs-compute05    ansible_host=10.1.31.35    ansible_ssh_pass=Huayun201&
+proucs-compute06    ansible_host=10.1.31.36    ansible_ssh_pass=Huayun201&
+proucs-compute07    ansible_host=10.1.31.37    ansible_ssh_pass=Huayun201&
+proucs-compute08    ansible_host=10.1.31.38    ansible_ssh_pass=Huayun201&
+proucs-compute09    ansible_host=10.1.31.39    ansible_ssh_pass=Huayun201&
+proucs-compute10    ansible_host=10.1.31.40    ansible_ssh_pass=Huayun201&
+proucs-compute11    ansible_host=10.1.31.41    ansible_ssh_pass=Huayun201&
+proucs-compute12    ansible_host=10.1.31.42    ansible_ssh_pass=Huayun201&
+proucs-compute13    ansible_host=10.1.31.43    ansible_ssh_pass=Huayun201&
+proucs-compute14    ansible_host=10.1.31.44    ansible_ssh_pass=Huayun201&
+proucs-compute15    ansible_host=10.1.31.45    ansible_ssh_pass=Huayun201&
+proucs-compute16    ansible_host=10.1.31.46    ansible_ssh_pass=Huayun201&
+proucs-compute17    ansible_host=10.1.31.47    ansible_ssh_pass=Huayun201&
+proucs-compute18    ansible_host=10.1.31.48    ansible_ssh_pass=Huayun201&
+proucs-compute19    ansible_host=10.1.31.49    ansible_ssh_pass=Huayun201&
+proucs-compute20    ansible_host=10.1.31.50    ansible_ssh_pass=Huayun201&
+proucs-compute21    ansible_host=10.1.31.51    ansible_ssh_pass=Huayun201&
+proucs-compute22    ansible_host=10.1.31.52    ansible_ssh_pass=Huayun201&
+
+
+#==================================================================================
+
+
+
+[production-cu]
+cu ansible_ssh_host=10.1.31.23 ansible_ssh_pass=huayun2016
+
+
+[bianmin]
+bianmin-controller01 ansible_ssh_host=192.168.35.11 ansible_ssh_pass=Bmhuayun201&
+
+[bianmin-compute]
+bianmin-compute01 ansible_ssh_host=192.168.35.12 ansible_ssh_pass=Bmhuayun201&
+bianmin-compute02 ansible_ssh_host=192.168.35.13 ansible_ssh_pass=Bmhuayun201&
+
+
+
+
+
+[zixingche]
+zixingchecontroller ansible_ssh_host=10.200.3.11 ansible_ssh_pass=Huayun201&
+
+[zixingche-compute]
+zixingchecompute01 ansible_ssh_host=10.200.3.12 ansible_ssh_pass=Huayun201&
+zixingchecompute02 ansible_ssh_host=10.200.3.13 ansible_ssh_pass=Huayun201&
+zixingchecompute03 ansible_ssh_host=10.200.3.14 ansible_ssh_pass=Huayun201&
+#zixingchecompute04 ansible_ssh_host=10.200.3.15 ansible_ssh_pass=Huayun201&
+#zixingchecompute05 ansible_ssh_host=10.200.3.16 ansible_ssh_pass=Huayun201&
+
+[allcompute:children]
+production-compute
+bianmin-compute
+zixingche-compute
+
+
+
+
+[allController]
+metro-controller01
+metro-controller02
+metro-controller03
+bianmin-controller01
+zixingchecontroller
+
+
+
+
+[temp]
+zixingche01 ansible_host=10.200.4.21 ansible_ssh_pass=bike@321
+
+[nagiosServer]
+nagiosServer ansible_host=10.1.31.25 ansible_ssh_pass=huayun2016

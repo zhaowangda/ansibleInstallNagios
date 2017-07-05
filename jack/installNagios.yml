@@ -1,0 +1,25 @@
+- hosts:  nagiosServer
+  vars:
+    - nagiosServer: nagiosServer
+  tasks:
+    - name: clean repo
+      command: yum clean all
+    - name: install nrpe
+      yum: name=nrpe state=installed 
+
+    - name: install bc
+      yum: name=bc state=installed
+
+
+
+    - name: push check SCripts
+      copy: src=/jack/nagiosConfig/plugins/  dest=/usr/lib64/nagios/plugins mode=777
+
+
+    - name: update nrpe config
+      copy: src=/jack/nagiosConfig/nrpe.cfg  dest=/etc/nagios/ mode=0777 
+
+
+
+    - name: set nrpe Service  
+      service: name=nrpe state=restarted enabled=yes

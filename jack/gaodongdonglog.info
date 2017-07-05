@@ -1,0 +1,27 @@
+总用量 8.4G
+-rw-r--r-- 1 zabbix zabbix 1.2K 7月   4 18:44 10.1.1.101-emc_pool_status.tmp
+-rw-r--r-- 1 zabbix zabbix  11M 7月   4 18:43 check-h3c-status.log
+-rw-rw-r-- 1 zabbix zabbix 3.5M 7月   4 18:43 emc_pool_discovery.log
+-rw-rw-r-- 1 zabbix zabbix  16M 7月   4 18:43 emc_pool_metric_item.log
+-rw-rw-r-- 1 zabbix zabbix  35M 7月   4 18:43 ibm_pool_discovery.log
+-rw-rw-r-- 1 zabbix zabbix 195M 7月   4 18:41 ibm_pool_metric_item.log
+-rw-rw-r-- 1 zabbix zabbix 3.2G 7月   4 18:44 openstack_vm_device_discovery.log
+-rw-rw-r-- 1 zabbix zabbix 3.2G 7月   4 18:44 openstack_vm_device_list.log
+-rw-rw-r-- 1 zabbix zabbix 108M 7月   4 18:43 openstack_vm_device_metric.log
+-rw-rw-r-- 1 zabbix zabbix 1.7G 7月   4 18:44 openstack_vm_metric.log
+-rw------- 1 root   root      0 6月  28 13:51 sess_nkiqne6gfsi40b87nlbc4t9dl3
+drwx------ 3 root   root   4.0K 7月   4 18:31 systemd-private-862626ca3a4a4a4e9dbce4b849f9e3c8-httpd.service-jxeXTu
+drwx------ 3 root   root   4.0K 7月   4 18:31 systemd-private-862626ca3a4a4a4e9dbce4b849f9e3c8-mariadb.service-sGaLwU
+drwx------ 2 root   root   4.0K 7月   4 18:35 tmpXcDJLC
+-rw-rw-r-- 1 zabbix zabbix  28K 7月   4 18:15 zabbix_mail.log
+-rw-rw-r-- 1 zabbix zabbix   36 6月  28 17:45 zabbix_server_3989.pinger
+-rw-rw-r-- 1 zabbix zabbix   25 6月  28 17:45 zabbix_server_4022.pinger
+-rw-rw-r-- 1 zabbix zabbix   34 7月   3 11:35 zabbix_server_4245.pinger
+-rw-rw-r-- 1 zabbix zabbix   45 7月   3 11:35 zabbix_server_4286.pinger
+-rw-rw-r-- 1 zabbix zabbix   35 6月  29 11:52 zabbix_server_5886.pinger
+-rw-rw-r-- 1 zabbix zabbix   60 6月  29 11:52 zabbix_server_5922.pinger
+-rw-rw-r-- 1 zabbix zabbix   11 7月   4 18:44 zabbix_server_6069.pinger
+-rw-rw-r-- 1 zabbix zabbix 435K 7月   4 18:44 zabbix_server.log
+-rw-rw-r-- 1 zabbix zabbix 1.1M 7月   4 18:36 zabbix_server.log.old
+-rw-rw-r-- 1 zabbix zabbix    3 7月   3 11:44 zabbix_server.pid
+-rw-rw-r-- 1 zabbix zabbix 1.5K 7月   4 18:13 zabbix_sms.log

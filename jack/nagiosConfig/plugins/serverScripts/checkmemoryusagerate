@@ -1,0 +1,32 @@
+#!/bin/sh
+##################################################################
+#init var
+
+rt=` sar 5 1 -r -e | grep Average: | awk '{print $4}'`
+rate=`echo $rt | awk -F"." '{print $1}'`
+status=` free -m | grep Mem` 
+now=` echo $status | awk '{print $3}'`
+#echo $rate
+###############################################################
+#echo init finished
+##################################################################
+
+if [ $rate -le 60 ]
+then
+	echo "OK - now the usage rate is : $rate ;the detail info : $status |using=${now}MB  "
+        exit 0
+elif [ $rate -gt 60 ] && [ $rate -le 80 ]
+then
+	echo "WARNING -  now the usage rate is : $rate ;the detail info : $status |using=${now}MB"
+	exit 1
+
+elif [ $rate -gt  80 ] 
+then
+	echo "CRITICAL -  now the usage rate is : $rate ;the detail info : $status | using=${now}MB"
+        exit 2
+else 
+	echo "UNKNOWN | using=0MB "
+	exit 3
+
+fi
+

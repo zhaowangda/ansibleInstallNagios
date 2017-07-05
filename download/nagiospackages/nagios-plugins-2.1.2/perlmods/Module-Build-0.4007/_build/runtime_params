@@ -1,0 +1,9 @@
+do{ my $x = {
+       'installdirs' => 'site',
+       'install_base' => '/usr/local/nagios/perl',
+       'config' => {
+                     'installsitelib' => '/usr/local/nagios/perl/lib',
+                     'installsitearch' => '/usr/local/nagios/perl/lib/x86_64-linux-thread-multi'
+                   }
+     };
+$x; }

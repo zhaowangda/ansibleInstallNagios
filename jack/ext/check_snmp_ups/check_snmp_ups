@@ -1,0 +1,415 @@
+#!/usr/bin/perl -w
+#
+# check_snmp_ups - Check status of UPS units using SNMP UPS-MIB
+#
+# Copyright (C) 2011 Oskar Liljeblad
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Run check_snmp_ups --help for usage information.
+# Written by Oskar Liljeblad <oskar@osk.mine.nu>.
+#
+
+require 5.10.0;
+use strict;
+use List::Util qw(max);
+use Net::SNMP;
+use Getopt::Long;
+use Nagios::Plugin;
+use Nagios::Plugin::Threshold;
+
+my $PROGRAM = 'check_snmp_ups';
+my $VERSION = '0.0+git';
+
+my $plugin = Nagios::Plugin->new(shortname => $PROGRAM);
+my %opt = (
+  'snmp-version' => 1,
+  'timeout' => 30,
+  'verbose' => 0,
+  'ignore-alarms' => '',
+  'warning' => '',
+  'critical' => '',
+);
+Getopt::Long::config('bundling');
+Getopt::Long::GetOptions(\%opt,
+  'host|H=s', 'timeout|t=i', 'community|C=s', 'snmp-version|V=s',
+  'auth-username=s', 'auth-password=s', 'priv-password=s',
+  'auth-protocol=s', 'priv-protocol=s', 'port=i', 'snmp-message-size=i',
+  'local-address=s', 'local-port=s', 'no-perfdata|n', 'ignore-alarms=s',
+  'ignore-test-results', 'verbose|v+', 'warning|w=s', 'critical|c=s',
+  'help', 'version'
+) || exit UNKNOWN;
+
+if (defined $opt{'help'}) {
+  print <<"__END__";
+Usage: $PROGRAM -H ADDRESS [OPTION]...
+Check status of uninterruptible power supply (UPS) systems via SNMP (UPS-MIB).
+
+General options:
+  -H, --host=ADDRESS               address or name of host to check
+  -n, --no-perfdata                do not print any performance data
+  -v, --verbose                    explain what is being done
+      --ignore-alarms=ALARM[,...]  ignore alarms by name or number
+      --ignore-test-results        do not warn about test results
+  -w, --warning=LOAD[,...]         warning threshold for output load
+  -c, --critical=LOAD[,...]        critical threshold for output load
+      --help                       display this help and exit
+      --version                    output version information and exit
+
+SNMP options:
+  -V, --snmp-version=VERSION       SNMP version (1, 2c, 3), default is 1
+  -t, --timeout=SECONDS            max time for individual SNMP requests
+      --port=NUMBER                SNMP port (if other than 161)
+      --local-address=ADDRESS      Local address for outgoing packets
+      --local-port=NUMBER          Local port for outgoing packets
+  -C, --community=NAME             SNMP community
+      --auth-username=USER         Authentication username (SNMPv3)
+      --auth-password=PASSWORD     Authentication password (SNMPv3)
+      --auth-protocol=md5|sha      Authentication protocol (SNMPv3)
+      --priv-password=PASSWORD     Encryption password (SNMPv3)
+      --priv-protocol=des|aes      Encryption protocol (SNMPv3)
+      --snmp-message-size=BYTES    Max size of SNMP request packets
+
+If multiple values are specified for --warning and --critical, the
+values match individual output lines rather than maximal output.
+
+Alarms (for --ignore-alarms) can be specified by name, number or
+full OID:
+
+  BatteryBad (1), OnBattery (2), LowBattery (3), DepletedBattery (4),
+  TempBad (5), InputBad (6), OutputBad (7), OutputOverload (8),
+  OnBypass (9), BypassBad (10), OutputOffAsRequested (11),
+  UpsOffAsRequested (12), ChargerFailed (13), UpsOutputOff (14),
+  UpsSystemOff (15), FanFailure (16), FuseFailure (17), GeneralFault (18),
+  DiagnosticTestFailed (19), CommunicationsLost (20), AwaitingPower (21),
+  ShutdownPending (22), ShutdownImminent (23), TestInProgress (24)
+
+Report $PROGRAM bugs to <oskar\@osk.mine.nu>.
+__END__
+  exit;
+}
+if (defined $opt{'version'}) {
+  print "$PROGRAM $VERSION\n";
+  print "Copyright (C) 2011 Oskar Liljeblad\n";
+  print "License AGPLv3+: GNU Affero GPL version 3 or later <http://gnu.org/licenses/agpl.html>.\n";
+  print "This is free software: you are free to change and redistribute it.\n";
+  print "There is NO WARRANTY, to the extent permitted by law.\n";
+  print "\nWritten by Oskar Liljeblad.\n";
+  exit;
+}
+
+my $baseoid = '1.3.6.1.2.1.33.1'; # upsObjects in upsMIB (UPS-MIB; RFC 1628)
+my $sysUpTime_oid = '1.3.6.1.2.1.1.3.0'; # sysUpTime in system in mib-2 (RFC1213-MIB; RFC 1213)
+
+my %alarm_name = (
+  "$baseoid.6.3.1" => 'BatteryBad',
+  "$baseoid.6.3.2" => 'OnBattery',
+  "$baseoid.6.3.3" => 'LowBattery',
+  "$baseoid.6.3.4" => 'DepletedBattery',
+  "$baseoid.6.3.5" => 'TempBad',
+  "$baseoid.6.3.6" => 'InputBad',
+  "$baseoid.6.3.7" => 'OutputBad',
+  "$baseoid.6.3.8" => 'OutputOverload',
+  "$baseoid.6.3.9" => 'OnBypass',
+  "$baseoid.6.3.10" => 'BypassBad',
+  "$baseoid.6.3.11" => 'OutputOffAsRequested',
+  "$baseoid.6.3.12" => 'UpsOffAsRequested',
+  "$baseoid.6.3.13" => 'ChargerFailed',
+  "$baseoid.6.3.14" => 'UpsOutputOff',
+  "$baseoid.6.3.15" => 'UpsSystemOff',
+  "$baseoid.6.3.16" => 'FanFailure',
+  "$baseoid.6.3.17" => 'FuseFailure',
+  "$baseoid.6.3.18" => 'GeneralFault',
+  "$baseoid.6.3.19" => 'DiagnosticTestFailed',
+  "$baseoid.6.3.20" => 'CommunicationsLost',
+  "$baseoid.6.3.21" => 'AwaitingPower',
+  "$baseoid.6.3.22" => 'ShutdownPending',
+  "$baseoid.6.3.23" => 'ShutdownImminent',
+  "$baseoid.6.3.24" => 'TestInProgress',
+);
+my %ignore_alarm;
+my %alarm_oid = map { lc $alarm_name{$_} => $_ } keys %alarm_name;
+foreach my $alarm (split(/,/, $opt{'ignore-alarms'})) {
+  if ($alarm =~ /^\d+$/) {
+    $ignore_alarm{"$baseoid.6.3.$alarm"} = 1;
+  } elsif ($alarm =~ /^\d+(\.\d+)*$/) {
+    $ignore_alarm{$alarm} = 1;
+  } elsif (exists $alarm_oid{lc $alarm}) {
+    $ignore_alarm{$alarm_oid{lc $alarm}} = 1;
+  } else {
+    $plugin->nagios_exit(UNKNOWN, "unsupported alarm name `$alarm'\n");
+  }
+}
+
+$plugin->nagios_exit(UNKNOWN, "missing --host/-H parameter\n") if !defined $opt{'host'};
+$plugin->nagios_exit(UNKNOWN, "surplus operand\n") if @ARGV;
+
+my @load_thresholds;
+my @load_warning = split(/,/, $opt{'warning'});
+my @load_critical = split(/,/, $opt{'critical'});
+$plugin->nagios_exit(UNKNOWN, "must specify equal number of warning and critical thresholds\n") if @load_warning != @load_critical;
+if (@load_warning != 0) {
+  for (my $c = 0; $c < @load_warning; $c++) {
+    $plugin->nagios_exit(UNKNOWN, "invalid warning threshold `$load_warning[$c]'\n") if $load_warning[$c] !~ /^(\d+|\d+:|~:\d+|\d+:\d+|@\d+:\d+)$/;
+    $plugin->nagios_exit(UNKNOWN, "invalid critical threshold `$load_critical[$c]'\n") if $load_warning[$c] !~ /^(\d+|\d+:|~:\d+|\d+:\d+|@\d+:\d+)$/;
+    push @load_thresholds, Nagios::Plugin::Threshold->set_thresholds(warning => $load_warning[$c], critical => $load_critical[$c]);
+  }
+}
+
+my $retries = 1; # default number of SNMP retries in Net::SNMP
+my @session_opts = (
+  -hostname => $opt{'host'},
+  -version => $opt{'snmp-version'},
+  -timeout => int ($opt{'timeout'} / ($retries+1))
+);
+$opt{'community'} //= 'public' if $opt{'snmp-version'} !~ /^3|snmpv3$/;
+push @session_opts, -port => $opt{'port'} if defined $opt{'port'};
+push @session_opts, -community => $opt{'community'} if defined $opt{'community'};
+push @session_opts, -username => $opt{'username'} if defined $opt{'username'};
+push @session_opts, -authpassword => $opt{'auth-password'} if defined $opt{'auth-password'};
+push @session_opts, -privpassword => $opt{'priv-password'} if defined $opt{'priv-password'};
+push @session_opts, -authprotocol => $opt{'auth-protocol'} if defined $opt{'auth-protocol'};
+push @session_opts, -privprotocol => $opt{'priv-protocol'} if defined $opt{'priv-protocol'};
+push @session_opts, -maxmsgsize => $opt{'snmp-message-size'} if defined $opt{'snmp-message-size'};
+push @session_opts, -localaddr => $opt{'localaddr'} if defined $opt{'localaddr'};
+push @session_opts, -localport => $opt{'localport'} if defined $opt{'localport'};
+my ($session, $error) = Net::SNMP->session(@session_opts);
+$plugin->nagios_exit(UNKNOWN, "cannot open SNMP session: $error\n") if !defined $session;
+$session->translate([-timeticks => 0]);
+
+my @request = map { "$baseoid.$_.0" } qw(1.1 1.2 2.1 2.2 2.3 2.4 2.5 2.6 2.7 3.1 3.2 4.1 4.2 4.3 5.1 5.2 6.1 7.1 7.3 7.5);
+push @request, $sysUpTime_oid;
+my $result = $session->get_request(-varbindlist => \@request);
+$plugin->nagios_exit(UNKNOWN, "cannot get SNMP (UPS-MIB) status: ".$session->error."\n") if !defined $result;
+
+@request = ();
+my $in_lines = get_result("$baseoid.3.2.0", qr/^\d+$/, 'number of input lines (UPS-MIB::upsInputNumLines)');
+push @request, "$baseoid.3.3.1.2.$_", "$baseoid.3.3.1.3.$_", "$baseoid.3.3.1.4.$_", "$baseoid.3.3.1.5.$_" for 1..$in_lines;
+my $out_lines = get_result("$baseoid.4.3.0", qr/^\d+$/, 'number of output lines (UPS-MIB::upsOutputNumLines)');
+push @request, "$baseoid.4.4.1.2.$_", "$baseoid.4.4.1.3.$_", "$baseoid.4.4.1.4.$_", "$baseoid.4.4.1.5.$_" for 1..$out_lines;
+my $by_lines = get_result("$baseoid.5.2.0", qr/^\d+$/, 'number of bypass lines (UPS-MIB::upsBypassNumLines)');
+push @request, "$baseoid.5.3.1.2.$_", "$baseoid.5.3.1.3.$_", "$baseoid.5.3.1.4.$_" for 1..$by_lines;
+my $alarms = get_result("$baseoid.6.1.0", qr/^\d+$/, 'number of alarms present (UPS-MIB::upsAlarmsPresent)');
+push @request, "$baseoid.6.2.1.2.$_", "$baseoid.6.2.1.3.$_" for 1..$alarms;
+while (@request) {
+  # Don't do more requests than 40 at a time. That should keep our SNMP
+  # packets below 1000 byte in size, according to my tests anyway...
+  my @subrequest = splice @request, 0, 40;
+  my $subresult = $session->get_request(-varbindlist => \@subrequest);
+  $result->{$_} = $subresult->{$_} foreach @subrequest;
+}
+
+$plugin->nagios_exit(UNKNOWN, "number of lines in thresholds (", scalar @load_thresholds, ") does not match actual number ($out_lines)\n")
+    if @load_thresholds > 1 && $out_lines != @load_thresholds;
+
+my $status = OK;
+my (@report_head, @reports_normal, @reports_critical, @reports_warning);
+push @report_head, $result->{"$baseoid.1.1.0"} if defined $result->{"$baseoid.1.1.0"};
+push @report_head, $result->{"$baseoid.1.2.0"} if defined $result->{"$baseoid.1.2.0"};
+push @report_head, 'Unknown UPS' if !@report_head;
+
+# Battery
+my $bat_status = get_result("$baseoid.2.1.0", qr/^[1-4]$/, 'battery status (UPS-MIB::upsBatteryStatus)');
+my @bat_statuses = qw(unknown normal low depleted);
+my $bat_secsonbat = get_result("$baseoid.2.2.0", qr/^\d+$/, 'number of seconds on battery (UPS-MIB::upsSecondsOnBattery)');
+my $bat_minsleft = get_result("$baseoid.2.3.0", qr/^\d+$/, 'number of minutes remaining (UPS-MIB::upsEstimatedMinutesRemaining)');
+my $bat_charge = get_result("$baseoid.2.4.0", qr/^\d+$/, 'battery charge (UPS-MIB::upsEstimatedChargeRemaining)');
+my $bat_voltage = get_result("$baseoid.2.5.0", qr/^\d+$/, 'battery voltage (UPS-MIB::upsBatteryVoltage)');
+my $bat_current = get_result("$baseoid.2.6.0", qr/^\d+$/, 'battery current (UPS-MIB::upsBatteryCurrent)');
+my $bat_temp = get_result("$baseoid.2.7.0", qr/^\d+$/, 'battery temperature (UPS-MIB::upsBatteryTemperature)');
+add_perfdata('bat_secsonbat', $bat_secsonbat, 's');
+add_perfdata('bat_minsleft', $bat_minsleft, 'min');
+add_perfdata('bat_charge', $bat_charge, '%', 0, 100);
+add_perfdata('bat_voltage', $bat_voltage * 0.1, 'V');
+add_perfdata('bat_current', $bat_current * 0.1, 'A');
+add_perfdata('bat_temp', $bat_temp, 'degC');
+my $bat_text = 'battery '.$bat_statuses[$bat_status-1].' ('.$bat_charge.'%; '.$bat_minsleft.'min)';
+if ($bat_status != 2) {
+  $status = CRITICAL;
+  push @reports_critical, $bat_text;
+} else {
+  push @reports_normal, $bat_text;
+}
+
+# Input
+my $in_bads = get_result("$baseoid.3.1.0", qr/^\d+$/, 'number of times bad input (UPS-MIB::upsInputLineBads)');
+add_perfdata('in_bads', $in_bads, 'c');
+for (my $c = 1; $c <= $in_lines; $c++) {
+  my $in_freq = get_result("$baseoid.3.3.1.2.$c", qr/^\d+$/, "input line $c frequency (UPS-MIB::upsInputFrequency.$c)");
+  my $in_voltage = get_result("$baseoid.3.3.1.3.$c", qr/^\d+$/, "input line $c voltage (UPS-MIB::upsInputVoltage.$c)");
+  my $in_current = get_result("$baseoid.3.3.1.4.$c", qr/^\d+$/, "input line $c current (UPS-MIB::upsInputCurrent.$c)");
+  my $in_power = get_result("$baseoid.3.3.1.5.$c", qr/^\d+$/, "input line $c power (UPS-MIB::upsInputTruePower.$c)");
+  add_perfdata("in_freq$c", $in_freq * 0.1, 'hz');
+  add_perfdata("in_voltage$c", $in_voltage * 0.1, 'V');
+  add_perfdata("in_current$c", $in_current * 0.1, 'A');
+  add_perfdata("in_power$c", $in_power, 'W');
+}
+
+# Output
+my $out_freq = get_result("$baseoid.4.2.0", qr/^\d+$/, 'output frequence (UPS-MIB::upsOutputFrequency)');
+add_perfdata('out_freq', $out_freq * 0.1, 'hz');
+my $out_source = get_result("$baseoid.4.1.0", qr/^[1-7]$/, 'output source (UPS-MIB::upsOutputSource)');
+my @out_sources = qw(other none normal bypass battery booster reducer);
+my $out_maxload = 0;
+for (my $c = 1; $c <= $out_lines; $c++) {
+  my $out_voltage = get_result("$baseoid.4.4.1.2.$c", qr/^\d+$/, "output line $c voltage (UPS-MIB::upsOutputVoltage)");
+  my $out_current = get_result("$baseoid.4.4.1.3.$c", qr/^\d+$/, "output line $c current (UPS-MIB::upsOutputCurrent)");
+  my $out_power = get_result("$baseoid.4.4.1.4.$c", qr/^\d+$/, "output line $c power (UPS-MIB::upsOutputPower)");
+  my $out_load = get_result("$baseoid.4.4.1.5.$c", qr/^\d+$/, "output line $c load (UPS-MIB::upsOutputPercentLoad)");
+  $out_maxload = max($out_maxload, $out_load);
+  add_perfdata("out_voltage$c", $out_voltage * 0.1, 'V');
+  add_perfdata("out_current$c", $out_current * 0.1, 'A');
+  add_perfdata("out_power$c", $out_power, 'W');
+  if (@load_thresholds == 0) {
+    add_perfdata("out_load$c", $out_load, '%', 0, 100);
+  } else {
+    my $threshold = $load_thresholds[@load_thresholds == 1 ? 0 : $c-1];
+    my $load_status = $threshold->get_status($out_load);
+    if ($load_status == CRITICAL) {
+      $status = CRITICAL;
+      push @reports_critical, "output line $c $out_load% load";
+    } elsif ($load_status == WARNING) {
+      $status = WARNING if $status != CRITICAL;
+      push @reports_warning, "output line $c $out_load% load";
+    }
+    add_perfdata("out_load$c", $out_load, '%', 0, 100, $threshold);
+  }
+}
+my $out_text = 'output '.$out_sources[$out_source-1];
+$out_text .= " ($out_maxload% load)" if $out_lines > 0;
+if ($out_source != 3) {
+  $status = CRITICAL;
+  push @reports_critical, $out_text;
+} else {
+  push @reports_normal, $out_text;
+}
+
+# Bypass
+my $by_freq = get_result("$baseoid.5.1.0", qr/^\d+$/, 'bypass frequence (UPS-MIB::upsBypassFrequency)');
+add_perfdata('by_freq', $by_freq * 0.1, 'hz');
+for (my $c = 1; $c <= $by_lines; $c++) {
+  my $by_voltage = get_result("$baseoid.5.3.1.2.$c", qr/^\d+$/, "bypass line $c voltage (UPS-MIB::upsBypassVoltage.$c)");
+  my $by_current = get_result("$baseoid.5.3.1.3.$c", qr/^\d+$/, "bypass line $c current (UPS-MIB::upsBypassCurrent.$c)");
+  my $by_power = get_result("$baseoid.5.3.1.4.$c", qr/^\d+$/, "bypass line $c power (UPS-MIB::upsBypassPower.$c)");
+  add_perfdata("by_voltage$c", $by_voltage * 0.1, 'V');
+  add_perfdata("by_current$c", $by_current * 0.1, 'A');
+  add_perfdata("by_power$c", $by_power, 'W');
+}
+
+# Alarms
+my $alarms_ignored = 0;
+my @alarm_texts;
+my $sysuptime = get_result($sysUpTime_oid, qr/^\d+$/, 'system uptime (RFC1213-MIB::sysUpTime)');
+for (my $c = 1; $c <= $alarms; $c++) {
+  my $alarm_oid = get_result("$baseoid.6.2.1.1.$c", qr/^\d+(\.\d+)*$/, "alarm $c id (UPS-MIB::upsAlarmId.$c)");
+  my $alarm_name = $alarm_name{$alarm_oid} // $alarm_oid;
+  my $alarm_time = get_result("$baseoid.6.2.1.3.$c", qr/^\d+$/, "alarm $c time (UPS-MIB::upsAlarmtime.$c)");
+  if (exists $ignore_alarm{$alarm_oid} || exists $ignore_alarm{$alarm_name}) {
+    $alarms_ignored++;
+  } elsif ($alarms == 1 || $c == $alarms || $result->{"$baseoid.6.2.1.3.".($c-1)} != $alarm_time) {
+    push @alarm_texts, $alarm_name.' ('.format_duration($alarm_time - $sysuptime).')';
+  } else {
+    push @alarm_texts, $alarm_name;
+  }
+}
+add_perfdata('alarms', $alarms);
+if ($alarms > $alarms_ignored) {
+  $status = CRITICAL;
+  push @reports_critical, 'alarms: '.join(', ', @alarm_texts);
+  push @reports_critical, $alarms.' ignored' if $alarms_ignored > 0;
+} elsif ($alarms_ignored > 0) {
+  push @reports_normal, $alarms.' '.noun($alarms, 'alarm', 'alarms').' ignored';
+} else {
+  push @reports_normal, 'no alarms';
+}
+
+# Test
+my %test_name = (
+  "$baseoid.7.7.1" => 'NoTestsInitiated',
+  "$baseoid.7.7.2" => 'AbortTestInProgress',
+  "$baseoid.7.7.3" => 'GeneralSystemsTest',
+  "$baseoid.7.7.4" => 'QuickBatteryTest',
+  "$baseoid.7.7.5" => 'DeepBatteryCalibration',
+);
+my $test_oid = get_result("$baseoid.7.1.0", qr/^\d+(\.\d+)*$/, 'test object identifier (UPS-MIB::upsTestId)');
+my $test_name = $test_name{$test_oid} // $test_oid;
+#my @test_statuses = qw(donePass doneWarning doneError aborted inProgress noTestsInitiated);
+my $test_status = get_result("$baseoid.7.3.0", qr/^[1-6]$/, 'test status (UPS-MIB::upsTestResultsSummary)');
+my $test_time = get_result("$baseoid.7.5.0", qr/^\d+$/, 'test start time (UPS-MIB::upsTestStartTime)');
+if ($test_status == 6 || $test_oid eq "$baseoid.7.7.1") { # No test have been run, no action
+  push @reports_normal, 'no test';
+} elsif ($test_status == 5) { # Test is running
+  push @reports_normal, "test running: $test_name (".format_duration($test_time-$sysuptime).')';
+} elsif ($test_status == 1) { # Test has run, and passed
+  push @reports_normal, "test passed: $test_name";
+} elsif (!defined $opt{'ignore-test-results'}) {
+  if ($test_status == 2) { # Test has run, but resulted in a warning
+    $status = WARNING if $status != CRITICAL;
+    push @reports_warning, "test warning: $test_name";
+  } elsif ($test_status == 3) { # Test has run, but resulted in an error
+    $status = CRITICAL;
+    push @reports_critical, "test failed: $test_name";
+  } elsif ($test_status == 4) { # Test was aborted
+    $status = WARNING if $status != CRITICAL;
+    push @reports_warning, "test aborted: $test_name";
+  }
+}
+
+my $report = '';
+if ($status == OK) {
+  $report = join(' ', @report_head).': '.join(', ', @reports_normal);
+} elsif ($status == WARNING) {
+  $report = join(', ', @reports_warning);
+  $report .= ', OK: '.join(', ', @reports_normal) if @reports_normal;
+} elsif ($status == CRITICAL) {
+  $report = join(', ', @reports_critical);
+  $report .= ', WARNING: '.join(', ', @reports_warning) if @reports_warning;
+  $report .= ', OK: '.join(', ', @reports_normal) if @reports_normal;
+}
+$plugin->nagios_exit($status, $report);
+
+sub noun {
+  my ($n,$s,$p) = @_;
+  return $n == 1 ? $s : $p;
+}
+
+sub add_perfdata {
+  my ($label, $value, $unit, $min, $max, $threshold) = @_;
+  if (!defined $opt{'no-perfdata'}) {
+    $unit //= '';
+    $max //= '';
+    $min //= 0;
+    if (defined $threshold) {
+      $plugin->add_perfdata(label => $label, value => $value, uom => $unit, min => $min, max => $max, threshold => $threshold);
+    } else {
+      $plugin->add_perfdata(label => $label, value => $value, uom => $unit, min => $min, max => $max);
+    }
+  }
+}
+
+sub format_duration {
+  my ($dur) = @_;
+  return int(($dur + 99) / 100).'s' if $dur < 60000;
+  return int(($dur + 59999) / 60000).'min' if $dur < 360000;
+  return int(($dur + 359999) / 360000).'h' if $dur < 8640000;;
+  return int(($dur + 8639999) / 8640000).'d';
+}
+
+sub get_result {
+  my ($oid, $re, $field) = @_;
+  my $value = $result->{$oid};
+  $plugin->nagios_exit(UNKNOWN, "missing $field\n") if !defined $value;
+  $plugin->nagios_exit(UNKNOWN, "invalid $field: $value\n") if $value !~ $re;
+  return $value;
+}

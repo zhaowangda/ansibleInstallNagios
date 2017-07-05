@@ -1,0 +1,41 @@
+
+#init var
+
+servicename=tomcat7
+status=3
+info="UNKNOWN - current status is :unknown"
+
+################################################################
+#echo init finished
+##################################################################
+st=` service $servicename status `
+#echo " $timenow the service status is: $st" >>"/home/${projectname}/${datenow}.log"
+
+temp1=`echo $st | grep "running" `
+if [ $? = 0 ]
+then
+	#echo "the service $servicename is running now!!!"
+        status=0
+	echo "OK - current status is:$st "
+	exit 0
+elif [ $? = 1 ]
+then 
+	temp=` echo $st | grep "stopped" `
+	if [ $? = 0 ]
+	then 
+	#	echo "the service $servicename is stopped,please chek !!"
+		status=1
+		
+        echo "WARNING - current status is:$st "
+	exit 1
+	else 
+	#	echo "the service $servicename is not installed,please install the package firstly!!!"
+		status=2
+		echo "CRITICAL - current status is:$st"
+		exit 2
+	fi
+
+
+fi
+#echo $info
+#exit $status

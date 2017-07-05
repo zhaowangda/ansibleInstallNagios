@@ -1,0 +1,13 @@
+#!/bin/sh
+##############################################
+diskname="hda "
+status=`iostat -d -k 1 1 | grep "hda "`
+times=` echo $status | awk '{print $3}'`
+if [ ! -z $times ]
+then 
+	echo "OK - info:$status |times=${times} KB/s "
+	exit 0
+else
+	echo "UNKNOWN"
+	exit 3
+fi
