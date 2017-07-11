@@ -24,20 +24,23 @@ command=$1
 source /root/adminrc			
 info=`$command`
 
-resultDown=` $command  |grep down |wc -l`
-resultDisabled=`$command |grep disabled |wc -l`
-resultError=`$command |grep error |wc -l `
+if [ $? -ne 0 ]
+then
+        echo "Unkown - command "$command" execute failed! | status=3"
+        exit 3
+fi
 
-if [[ ( $resultDown -ne 0 ) || ( $resultError -ne 0 ) ]]
+
+
+result=`echo $info  | grep -E '(error|down|disabled)' | wc -l `
+
+
+if [  $result -ne 0  ]
 then
-	echo "Error - error exist in "$command" | status=2"
-	exit 2
-elif [ $resultDisabled -ne 0 ]
-then
-	echo "Warning - disabled exist in "$command" |status=1  "
-	exit 1
+        echo "Critical - error exist in "$command" ;info:$info| status=2"
+        exit 2
 else
-	echo "OK - result: OK; command: "$command" |status=0 "
-#	echo $info
-	exit 0
+        echo "OK - result: OK; command: "$command";info:$info |status=0 "
+#       echo $info
+        exit 0
 fi
