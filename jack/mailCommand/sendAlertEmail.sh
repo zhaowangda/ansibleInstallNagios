@@ -1,10 +1,10 @@
 #/bin/sh
 
 sendEmail="/usr/sbin/sendEmail"
-sender=wuxi-metro@chinac.com
+sender=
 recipient=$1
-smtp=smtp.chinac.com
-cipher=ZUpNT7:FfL6K@]vc19@VW3K2ZsQ]op
+smtp=
+cipher=
 subject=`iconv -t GB2312 -f UTF-8  << EOF
 $2
 EOF`
