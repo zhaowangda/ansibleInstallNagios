@@ -4,16 +4,16 @@ sendMobileMessage="/usr/bin/mysql"
 sendEmail="/usr/sbin/sendEmail"
 #-------------------------------------------------------
 #mail alert config
-sender=hii-notice@chinac.com
-smtp=smtp.chinac.com
-cipher=PxQ3GS5!PxQ3GS5!
+sender=abc@126.com
+smtp=smtp.126.com
+cipher=asdf@1234
 
 #----------------------------------
 #message alert config
-mysqlServer=10.1.254.251
+mysqlServer=192.168.1.1
 mysqlPort=3366
-mysqlUser=mas
-mysqlpasswd=JXmas@2012
+mysqlUser=mroot
+mysqlpasswd=root@2012
 #-----------------------------------
 
 #---------------------------------------------
