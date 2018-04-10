@@ -1,3 +1,0 @@
-172.16.41.11 2016-10-26 11:15:35 CHECK_ESXI OK - cpu usage=45.65 % | cpu_usage=45.65%;90;110
-172.16.41.12 2016-10-26 11:15:35 CHECK_ESXI OK - cpu usage=14.89 % | cpu_usage=14.89%;90;110
-172.16.41.10 2016-10-26 11:15:36 CHECK_ESXI OK - cpu usage=15.92 % | cpu_usage=15.92%;90;110
